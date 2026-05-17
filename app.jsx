@@ -27,10 +27,24 @@ const sumTotals = (items) => items.reduce(
 );
 
 const GOALS = [
-{ key: "manter", label: "Manter macros", hint: "Mesma equivalência calórica e de macros, mais variedade" },
-{ key: "mais_proteina", label: "Mais proteína", hint: "Aumentar proteína mantendo kcal próximo" },
-{ key: "reduzir_kcal", label: "Reduzir calorias", hint: "Cortar ~20% das kcal mantendo saciedade" },
-{ key: "mais_saudavel", label: "Mais saudável", hint: "Trocar processados por opções in natura" }];
+{ key: "manter", label: "Substituir por refeição equivalente", short: "Equivalente", hint: "Mesma equivalência calórica e de macros, com variedade" },
+{ key: "reduzir_kcal", label: "Diminuir calorias", short: "Menos kcal", hint: "Cortar ~20% das kcal mantendo saciedade" },
+{ key: "mais_saudavel", label: "Refeição mais saudável", short: "Mais saudável", hint: "Trocar processados por opções in natura" },
+{ key: "mais_proteina", label: "Mais proteína", short: "Mais proteína", hint: "Aumentar proteína mantendo kcal próximo" }];
+
+// Big icons for goal chips
+function GoalIcon({ goalKey, size = 40 }) {
+  const common = { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.4, strokeLinecap: "round", strokeLinejoin: "round" };
+  if (goalKey === "manter") return (
+    <svg {...common}><path d="m7 4-3 3 3 3"/><path d="M4 7h13a3 3 0 0 1 3 3v0"/><path d="m17 20 3-3-3-3"/><path d="M20 17H7a3 3 0 0 1-3-3v0"/></svg>);
+  if (goalKey === "reduzir_kcal") return (
+    <svg {...common}><path d="M12 2v3"/><path d="M9 4h6"/><path d="M12 22a8 8 0 0 0 8-8c0-4-3-6-3-10H7c0 4-3 6-3 10a8 8 0 0 0 8 8Z"/><path d="M9 14h6"/></svg>);
+  if (goalKey === "mais_saudavel") return (
+    <svg {...common}><path d="M11 20A7 7 0 0 1 4 13a7 7 0 0 1 7-7c1.5 0 2.8.5 4 1.4"/><path d="M11 20c0-6.5 4-12 10-12"/><path d="M14 9c1.5 0 3 .5 4 1.5"/></svg>);
+  if (goalKey === "mais_proteina") return (
+    <svg {...common}><path d="M6.5 6.5 17.5 17.5"/><path d="M21 21a4 4 0 0 1-5.6 0L3 8.6A4 4 0 0 1 8.6 3L21 15.4a4 4 0 0 1 0 5.6Z"/></svg>);
+  return null;
+}
 
 
 // ---------- AI Prompt ----------
@@ -59,35 +73,44 @@ OBJETIVO: ${goal.label} — ${goal.hint}
 REGRA: ${goalRule}
 
 TAREFA:
-Para CADA item original (na ordem, mesmo índice), decida uma ação:
+Gere DUAS opções alternativas de alteração (A e B), DIFERENTES entre si — substitutos distintos, abordagens distintas, para o usuário comparar.
+
+Para CADA opção, decida para CADA item original (na ordem, mesmo índice) uma ação:
 - "manter": item permanece igual.
 - "substituir": indique novo alimento e quantidade.
 - "remover": item sai da refeição.
 
-Você também pode ADICIONAR de 0 a 2 novos itens à refeição.
+Você também pode ADICIONAR de 0 a 2 novos itens em cada opção.
 
 Seja realista para a culinária brasileira. Calcule kcal e macros corretos para cada item novo.
 
 Responda APENAS com JSON válido (sem markdown, sem comentários, sem texto fora do JSON):
 
 {
-  "alteracoes": [
-    {
-      "indice_original": 0,
-      "acao": "manter" | "substituir" | "remover",
-      "novo": null,
-      "motivo": "frase curta (até 12 palavras), só se houver substituição ou remoção"
-    }
-  ],
-  "adicionados": [
-    { "nome": "string", "quantidade": numero, "unidade": "g" | "ml", "kcal": numero, "c": numero, "p": numero, "g": numero, "motivo": "frase curta" }
-  ],
-  "justificativa": "2-3 frases explicando a estratégia geral da alteração, no tom da Nutri Stael."
+  "opcaoA": {
+    "titulo": "string curta descrevendo a abordagem (ex: 'Troca por carboidratos integrais')",
+    "alteracoes": [
+      { "indice_original": 0, "acao": "manter" | "substituir" | "remover", "novo": null, "motivo": "frase curta" }
+    ],
+    "adicionados": [
+      { "nome": "string", "quantidade": numero, "unidade": "g" | "ml", "kcal": numero, "c": numero, "p": numero, "g": numero, "motivo": "frase curta" }
+    ],
+    "justificativa": "2-3 frases sobre a estratégia desta opção."
+  },
+  "opcaoB": {
+    "titulo": "string curta",
+    "alteracoes": [
+      { "indice_original": 0, "acao": "manter" | "substituir" | "remover", "novo": null, "motivo": "frase curta" }
+    ],
+    "adicionados": [ ],
+    "justificativa": "2-3 frases."
+  }
 }
 
 Para "substituir", "novo" deve ser objeto: { "nome": "string", "quantidade": numero, "unidade": "g"|"ml", "kcal": numero, "c": numero, "p": numero, "g": numero }.
 Para "manter" e "remover", "novo" é null.
-"alteracoes" deve ter exatamente ${items.length} entradas, uma por item original.`;
+Cada "alteracoes" deve ter exatamente ${items.length} entradas, uma por item original.
+opcaoA e opcaoB DEVEM ser claramente diferentes (substitutos distintos, não apenas redoses).`;
 }
 
 async function getMealSuggestion(items, goal) {
@@ -99,7 +122,7 @@ async function getMealSuggestion(items, goal) {
     const r = await fetch("/api/analyze", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt }),
+      body: JSON.stringify({ prompt })
     });
     if (r.ok) {
       const j = await r.json();
@@ -138,16 +161,15 @@ function Header({ onReset }) {
   return (
     <header className="header">
       <div className="brand" onClick={onReset}>
-        <div className="brand-mark">N</div>
+        <div className="brand-mark brand-mark-img">
+          <img src="helper-logo.png" alt="Helper das realizadas" />
+        </div>
         <div>
-          <div className="brand-name">Nutri <em> Helper
-</em></div>
+          <div className="brand-name">Helper <em>das realizadas</em></div>
           <div className="brand-tag">Alterações inteligentes de refeição</div>
         </div>
       </div>
       <nav className="header-nav">
-        <button></button>
-        <button></button>
         <button>Sobre</button>
       </nav>
     </header>);
@@ -454,14 +476,15 @@ function GoalSelector({ value, onChange }) {
           className={"goal-chip" + (value === g.key ? " active" : "")}
           onClick={() => onChange(g.key)}
           title={g.hint}>
-          
-            <span className="goal-chip-name">{g.label}</span>
-            <span className="goal-chip-hint">{g.hint}</span>
+            <div className="goal-chip-icon"><GoalIcon goalKey={g.key} size={44} /></div>
+            <div className="goal-chip-text">
+              <span className="goal-chip-name">{g.label}</span>
+              <span className="goal-chip-hint">{g.hint}</span>
+            </div>
           </button>
         )}
       </div>
     </div>);
-
 }
 
 // ---------- Builder screen ----------
@@ -602,18 +625,31 @@ function AddedRow({ item }) {
 function Result({ original, result, goalKey, onReset }) {
   const originalTotals = useMemo(() => sumTotals(original), [original]);
 
+  // Normaliza: se vier no formato antigo (sem opções A/B), envolve em opcaoA
+  const options = useMemo(() => {
+    if (result.opcaoA || result.opcaoB) {
+      const arr = [];
+      if (result.opcaoA) arr.push({ letra: "A", ...result.opcaoA });
+      if (result.opcaoB) arr.push({ letra: "B", ...result.opcaoB });
+      return arr;
+    }
+    return [{ letra: "A", titulo: "Sugestão", alteracoes: result.alteracoes, adicionados: result.adicionados, justificativa: result.justificativa }];
+  }, [result]);
+
+  const [selectedOpt, setSelectedOpt] = useState(0);
+  const opt = options[selectedOpt] || options[0];
+
   const suggestedItems = useMemo(() => {
     const out = [];
-    (result.alteracoes || []).forEach((ch) => {
+    (opt.alteracoes || []).forEach((ch) => {
       const it = original[ch.indice_original];
       if (!it) return;
-      if (ch.acao === "manter") out.push(it);else
-      if (ch.acao === "substituir" && ch.novo) out.push(ch.novo);
-      // remover: skip
+      if (ch.acao === "manter") out.push(it);
+      else if (ch.acao === "substituir" && ch.novo) out.push(ch.novo);
     });
-    (result.adicionados || []).forEach((a) => out.push(a));
+    (opt.adicionados || []).forEach((a) => out.push(a));
     return out;
-  }, [result, original]);
+  }, [opt, original]);
 
   const suggestedTotals = useMemo(() => sumTotals(suggestedItems), [suggestedItems]);
   const goal = GOALS.find((g) => g.key === goalKey);
@@ -626,8 +662,22 @@ function Result({ original, result, goalKey, onReset }) {
           Objetivo: {goal.label}
         </div>
         <h2>Sua refeição ajustada</h2>
-        <p>Veja como cada item foi alterado e o impacto nos totais</p>
+        <p>Compare as opções abaixo e escolha a que se encaixa melhor.</p>
       </div>
+
+      {options.length > 1 &&
+      <div className="option-toggle">
+          {options.map((o, i) =>
+          <button
+            key={o.letra}
+            className={"option-tab" + (selectedOpt === i ? " active" : "")}
+            onClick={() => setSelectedOpt(i)}>
+              <span className="option-letter">Opção {o.letra}</span>
+              {o.titulo && <span className="option-title">{o.titulo}</span>}
+            </button>
+          )}
+        </div>
+      }
 
       <div className="totals-comparison">
         <TotalsCard totals={originalTotals} title="Refeição original" />
@@ -636,30 +686,26 @@ function Result({ original, result, goalKey, onReset }) {
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 5l7 7-7 7" /></svg>
           </div>
         </div>
-        <TotalsCard totals={suggestedTotals} title="Refeição sugerida" accent="sage" compareTo={originalTotals} />
+        <TotalsCard totals={suggestedTotals} title={"Opção " + opt.letra} accent="sage" compareTo={originalTotals} />
       </div>
-
-      {result.justificativa &&
-      <div className="quote-card">
-          <div className="quote-avatar">S</div>
-          <div className="quote-body">
-            <div className="quote-author">Nutri Stael</div>
-            <div className="quote-text">"{result.justificativa}"</div>
-          </div>
-        </div>
-      }
 
       <div className="changes-section">
         <div className="changes-title">Alterações item a item</div>
         <ul className="changes-list">
-          {(result.alteracoes || []).map((ch, i) =>
-          <ChangeRow key={"c" + i} change={ch} item={original[ch.indice_original]} />
+          {(opt.alteracoes || []).map((ch, i) =>
+          <ChangeRow key={"c" + selectedOpt + "-" + i} change={ch} item={original[ch.indice_original]} />
           )}
-          {(result.adicionados || []).map((a, i) =>
-          <AddedRow key={"a" + i} item={a} />
+          {(opt.adicionados || []).map((a, i) =>
+          <AddedRow key={"a" + selectedOpt + "-" + i} item={a} />
           )}
         </ul>
       </div>
+
+      {opt.justificativa &&
+      <div className="justification">
+          <div className="justification-text">{opt.justificativa}</div>
+        </div>
+      }
 
       <div style={{ textAlign: "center", marginTop: 36 }}>
         <button className="reset-btn" onClick={onReset}>
@@ -668,7 +714,6 @@ function Result({ original, result, goalKey, onReset }) {
         </button>
       </div>
     </section>);
-
 }
 
 // ---------- Loading ----------
@@ -754,7 +799,7 @@ function App() {
         }
       </main>
       <footer className="footer">
-        Nutri Stael · <em>alterações inteligentes para refeições do dia a dia</em>
+        Helper das refeições · <em>alterações inteligentes para o dia a dia</em>
       </footer>
 
       <TweaksUI t={t} setTweak={setTweak} />
