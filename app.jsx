@@ -174,13 +174,31 @@ function FoodPicker({ onAdd }) {
     const myId = ++reqRef.current;
     const t = setTimeout(async () => {
       let results = null;
-      let used = "local";
+      let used = null;
+
+      // 1) Gemini (primário) — busca com macros calculados pela IA
       try {
-        if (window.fatsecret && window.fatsecret.isConfigured()) {
-          const remote = await window.fatsecret.search(q);
-          if (remote) {results = remote;used = "fatsecret";}
+        const r = await fetch(`/api/search-foods?q=${encodeURIComponent(q)}`);
+        if (r.ok) {
+          const j = await r.json();
+          if (Array.isArray(j.foods) && j.foods.length > 0) {
+            results = j.foods;
+            used = "gemini";
+          }
         }
-      } catch (e) {console.warn("FatSecret falhou:", e);}
+      } catch (e) {console.warn("Gemini search falhou:", e);}
+
+      // 2) FatSecret (opcional, se configurado nos Tweaks)
+      if (!results) {
+        try {
+          if (window.fatsecret && window.fatsecret.isConfigured()) {
+            const remote = await window.fatsecret.search(q);
+            if (remote && remote.length > 0) {results = remote;used = "fatsecret";}
+          }
+        } catch (e) {console.warn("FatSecret falhou:", e);}
+      }
+
+      // 3) Base local (fallback final)
       if (!results) {
         const n = normalize(q);
         results = window.FOODS.
@@ -188,11 +206,12 @@ function FoodPicker({ onAdd }) {
         slice(0, 8);
         used = "local";
       }
+
       if (reqRef.current !== myId) return;
       setSuggestions(results);
       setSearching(false);
       setSource(used);
-    }, 280);
+    }, 320);
     return () => clearTimeout(t);
   }, [query]);
 
@@ -291,7 +310,12 @@ function FoodPicker({ onAdd }) {
       <div className="suggestions">
           {source &&
         <div className={"sugg-source " + source}>
-              {source === "fatsecret" ?
+              {source === "gemini" ?
+          <>
+                  <span className="src-dot"></span>
+                  Base Gemini · valores nutricionais por 100{suggestions[0]?.unidade || "g"}
+                </> :
+          source === "fatsecret" ?
           <>
                   <span className="src-dot"></span>
                   Base FatSecret
@@ -299,7 +323,7 @@ function FoodPicker({ onAdd }) {
 
           <>
                   <span className="src-dot local"></span>
-                  Base local · {window.fatsecret?.isConfigured() ? "FatSecret indisponível" : "configure FatSecret nos Tweaks"}
+                  Base local · Gemini indisponível
                 </>
           }
             </div>

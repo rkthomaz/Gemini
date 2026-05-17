@@ -846,6 +846,7 @@ body.dense .change-row { padding: 12px 14px; }
   background: var(--surface-2);
 }
 .sugg-source.fatsecret { color: var(--sage); }
+.sugg-source.gemini { color: var(--sage); }
 .src-dot {
   width: 6px;
   height: 6px;
