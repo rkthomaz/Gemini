@@ -416,12 +416,28 @@ function MealList({ items, onRemove }) {
 
 }
 
+// Build a natural-language summary of foods (no quantities)
+const summarizeFoods = (items) => {
+  if (!items || items.length === 0) return null;
+  const names = items.map((it) => {
+    let n = (it.nome || "").trim();
+    // strip parenthesized notes and category prefixes that read odd in a summary
+    n = n.split(" · ")[0];
+    return n.toLowerCase();
+  });
+  if (names.length === 1) return names[0];
+  if (names.length === 2) return names.join(" e ");
+  return names.slice(0, -1).join(", ") + " e " + names[names.length - 1];
+};
+
 // ---------- Totals card ----------
-function TotalsCard({ totals, title, accent = "neutral", compareTo = null }) {
+function TotalsCard({ totals, title, accent = "neutral", compareTo = null, items = null }) {
   const max = Math.max(totals.c, totals.p, totals.g, compareTo?.c || 0, compareTo?.p || 0, compareTo?.g || 0, 10);
+  const summary = summarizeFoods(items);
   return (
     <div className={"totals-card " + (accent === "sage" ? "sage" : "")}>
       <div className={"card-label " + (accent === "sage" ? "sage" : "")}>{title}</div>
+      {summary && <div className="totals-summary">{summary}</div>}
       <div className="totals-kcal">
         <span className="num">{totals.kcal}</span>
         <span className="lbl">kcal</span>
@@ -433,7 +449,6 @@ function TotalsCard({ totals, title, accent = "neutral", compareTo = null }) {
         <MacroRow label="Gorduras" cls="fat" value={totals.g} max={max} compare={compareTo?.g} />
       </div>
     </div>);
-
 }
 
 function MacroRow({ label, cls, value, max, compare }) {
@@ -680,13 +695,13 @@ function Result({ original, result, goalKey, onReset }) {
       }
 
       <div className="totals-comparison">
-        <TotalsCard totals={originalTotals} title="Refeição original" />
+        <TotalsCard totals={originalTotals} title="Refeição original" items={original} />
         <div className="swap-arrow">
           <div className="swap-arrow-inner">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 5l7 7-7 7" /></svg>
           </div>
         </div>
-        <TotalsCard totals={suggestedTotals} title={"Opção " + opt.letra} accent="sage" compareTo={originalTotals} />
+        <TotalsCard totals={suggestedTotals} title={"Opção " + opt.letra} accent="sage" compareTo={originalTotals} items={suggestedItems} />
       </div>
 
       <div className="changes-section">

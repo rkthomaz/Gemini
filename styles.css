@@ -425,6 +425,19 @@ body.dense .change-row { padding: 12px 14px; }
   background: var(--sage);
 }
 
+/* Summary of foods (no quantities) under the title */
+.totals-summary {
+  font-family: var(--serif);
+  font-size: 18px;
+  line-height: 1.35;
+  color: var(--ink);
+  font-style: italic;
+  letter-spacing: -0.005em;
+  margin-top: -8px;
+  text-transform: lowercase;
+}
+.totals-summary::first-letter { text-transform: uppercase; }
+
 .totals-kcal {
   display: flex;
   align-items: baseline;
